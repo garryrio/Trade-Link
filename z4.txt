@@ -1,0 +1,5 @@
+﻿npm.ps1 -> disabled
+npx.ps1 -> disabled
+corepack.ps1 tidak ada
+npm.cmd ada=True
+npx.cmd ada=True

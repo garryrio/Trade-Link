@@ -1,0 +1,183 @@
+@import "tailwindcss";
+
+/* ============================================================
+   TradeLink design tokens - tema biru
+   Tailwind v4 pakai konfigurasi berbasis CSS lewat @theme.
+   Setiap --color-* otomatis jadi utility (bg-brand-600, text-brand-600, dst)
+   ============================================================ */
+@theme {
+  /* Biru utama - dipakai untuk brand, tombol, aksen */
+  --color-brand-50: #eff6ff;
+  --color-brand-100: #dbeafe;
+  --color-brand-200: #bfdbfe;
+  --color-brand-300: #93c5fd;
+  --color-brand-400: #60a5fa;
+  --color-brand-500: #3b82f6;
+  --color-brand-600: #2563eb;
+  --color-brand-700: #1d4ed8;
+  --color-brand-800: #1e40af;
+  --color-brand-900: #1e3a8a;
+  --color-brand-950: #172554;
+
+  /* Biru tua kehijauan - dipakai untuk background gelap & footer */
+  --color-navy-50: #f0f6fb;
+  --color-navy-100: #d9e8f5;
+  --color-navy-200: #b6d2ea;
+  --color-navy-300: #84b3da;
+  --color-navy-400: #4a8cc4;
+  --color-navy-500: #2e6fa9;
+  --color-navy-600: #22588e;
+  --color-navy-700: #1c4673;
+  --color-navy-800: #163a5f;
+  --color-navy-900: #0f2846;
+  --color-navy-950: #081a2e;
+
+  /* Warna semantik untuk naik/turun harga & status */
+  --color-up: #059669;
+  --color-down: #dc2626;
+
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+
+  --shadow-card: 0 1px 2px 0 rgb(15 40 70 / 0.05),
+    0 4px 16px -4px rgb(15 40 70 / 0.08);
+  --shadow-card-hover: 0 2px 4px 0 rgb(15 40 70 / 0.06),
+    0 12px 32px -8px rgb(15 40 70 / 0.16);
+}
+
+/* ============================================================
+   Base
+   ============================================================ */
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-slate-50 text-navy-900 antialiased;
+    font-family: var(--font-sans);
+  }
+
+  /* Fokus yang selalu terlihat - penting untuk aksesibilitas keyboard */
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-brand-600;
+  }
+
+  /* Hormati preferensi user yang sensitif terhadap animasi */
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+/* ============================================================
+   Utilities & komponen yang dipakai berulang
+   ============================================================ */
+@layer components {
+  .container-page {
+    @apply mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8;
+  }
+
+  .card {
+    @apply rounded-xl border border-slate-200 bg-white shadow-[var(--shadow-card)];
+  }
+
+  .field-label {
+    @apply mb-1.5 block text-sm font-medium text-navy-800;
+  }
+
+  .field-hint {
+    @apply mt-1.5 text-xs text-slate-500;
+  }
+
+  /* Dipakai oleh semua <input>, <select>, <textarea> di form */
+  .field-input {
+    @apply w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-navy-900
+           placeholder:text-slate-400
+           focus:border-brand-500 focus:ring-2 focus:ring-brand-500/25 focus:outline-none
+           disabled:cursor-not-allowed disabled:bg-slate-100;
+  }
+
+  /* Latar bergaris halus untuk hero section */
+  .hero-grid {
+    background-image:
+      linear-gradient(to right, rgb(255 255 255 / 0.07) 1px, transparent 1px),
+      linear-gradient(to bottom, rgb(255 255 255 / 0.07) 1px, transparent 1px);
+    background-size: 44px 44px;
+  }
+}
+
+/* Scrollbar tipis untuk panel chat & tabel */
+.scrollbar-slim {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-brand-300) transparent;
+}
+
+.scrollbar-slim::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.scrollbar-slim::-webkit-scrollbar-thumb {
+  background-color: var(--color-brand-300);
+  border-radius: 9999px;
+}
+
+.scrollbar-slim::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Animasi titik "sedang mengetik" pada asisten AI */
+@keyframes tl-bounce {
+  0%,
+  80%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.4;
+  }
+  40% {
+    transform: translateY(-4px);
+    opacity: 1;
+  }
+}
+
+.typing-dot {
+  animation: tl-bounce 1.2s infinite ease-in-out;
+}
+
+/* Animasi highlight singkat saat harga berubah */
+@keyframes tl-flash-up {
+  from {
+    background-color: color-mix(in srgb, var(--color-up) 18%, transparent);
+  }
+  to {
+    background-color: transparent;
+  }
+}
+
+@keyframes tl-flash-down {
+  from {
+    background-color: color-mix(in srgb, var(--color-down) 18%, transparent);
+  }
+  to {
+    background-color: transparent;
+  }
+}
+
+.flash-up {
+  animation: tl-flash-up 1s ease-out;
+}
+
+.flash-down {
+  animation: tl-flash-down 1s ease-out;
+}
