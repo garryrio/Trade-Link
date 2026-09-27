@@ -18,6 +18,7 @@ Dibangun dengan Next.js 16 (App Router), TypeScript, dan Tailwind CSS v4 dengan 
 | **Kalkulator ekspor impor** — landed cost impor (bea masuk, PPN, PPh 22, biaya lokal) dan penyusunan harga jual ekspor (FOB/CFR/CIF, titik impas) | `/kalkulator` | Berfungsi penuh |
 | **Edukasi & regulasi** — 8 panduan, daftar dokumen wajib, 22 tautan situs resmi, 20 istilah | `/edukasi` | Berfungsi penuh |
 | **Asisten AI** — chat streaming dengan konteks perdagangan Indonesia | `/asisten` | Butuh `GEMINI_API_KEY` |
+| **Bubble asisten melayang** — bulatan yang bisa digeser di semua halaman, klik untuk membuka panel chat | seluruh halaman kecuali `/asisten` | Butuh `GEMINI_API_KEY` |
 
 ---
 
@@ -242,7 +243,25 @@ Perlu diingat model Gemini 3 ke atas **tidak menerima** `temperature`, `topP`, `
 
 **Keamanan perender markdown.** `SimpleMarkdown` membangun elemen React dan tidak pernah memakai `dangerouslySetInnerHTML`, sehingga keluaran model AI selalu ditampilkan sebagai teks, bukan dieksekusi sebagai HTML.
 
-**Aksesibilitas.** Skip-link ke konten utama, fokus keyboard yang selalu terlihat, label pada seluruh input form, `aria-live` pada hasil pencarian dan percakapan, tabel dengan `caption` dan `scope`, serta penghormatan terhadap `prefers-reduced-motion`.
+**Bubble asisten melayang.** `src/components/assistant/FloatingChat.tsx` dipasang
+sekali di `layout.tsx` dan menyembunyikan dirinya di `/asisten`. Beberapa
+keputusan di dalamnya:
+
+- Geser memakai **Pointer Events** dengan `setPointerCapture`, jadi satu jalur
+  kode menangani tetikus, sentuh, dan pena sekaligus. `touchAction: "none"`
+  mencegah halaman ikut tergulir saat digeser di ponsel.
+- Klik dibedakan dari geser lewat ambang jarak. Jaraknya diukur **dari titik
+  tekan awal**, bukan antar-frame; kalau diukur antar-frame, geseran lambat
+  tidak akan pernah melewati ambang dan salah dianggap klik.
+- Setelah dilepas, bubble menempel ke sisi terdekat agar tidak menghalangi
+  tengah layar. Posisinya disimpan di `localStorage`.
+- Bubble baru dirender setelah mount, karena posisi awalnya bergantung pada
+  ukuran jendela dan `localStorage` yang tidak ada di server. Ini menghindari
+  hydration mismatch sekaligus kedipan posisi.
+- Logika percakapan berada di hook `useAssistantChat`, dipakai bersama dengan
+  halaman penuh, jadi streaming dan pembatalan tidak diduplikasi.
+
+**Aksesibilitas.** Skip-link ke konten utama, fokus keyboard yang selalu terlihat, label pada seluruh input form, `aria-live` pada hasil pencarian dan percakapan, tabel dengan `caption` dan `scope`, serta penghormatan terhadap `prefers-reduced-motion`. Bubble asisten adalah `<button>` sungguhan: bisa difokuskan dengan Tab, dibuka dengan Enter, dipindahkan dengan tombol panah, dan panelnya ditutup dengan Escape.
 
 ---
 

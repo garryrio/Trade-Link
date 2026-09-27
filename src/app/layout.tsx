@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
+import { FloatingChat } from "@/components/assistant/FloatingChat";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -55,6 +56,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           {children}
         </main>
         <Footer />
+        {/* Bubble asisten melayang di atas seluruh halaman.
+            Menyembunyikan dirinya sendiri di /asisten. */}
+        <FloatingChat />
       </body>
     </html>
   );
