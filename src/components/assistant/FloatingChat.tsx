@@ -62,18 +62,44 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
 }
 
-/** Posisi bawaan: sudut kanan bawah. */
-function defaultPosition(): Position {
+/** Posisi bawaan: sudut kanan bawah, di atas area aman perangkat. */
+function defaultPosition(safeBottom = 0): Position {
   return {
     x: window.innerWidth - BUBBLE_SIZE - EDGE_MARGIN,
-    y: window.innerHeight - BUBBLE_SIZE - EDGE_MARGIN - 8,
+    y: window.innerHeight - BUBBLE_SIZE - EDGE_MARGIN - 8 - safeBottom,
   };
 }
 
-function clampToViewport(pos: Position): Position {
+/**
+ * Ukur tinggi area aman di bagian bawah layar.
+ *
+ * Pada iPhone tanpa tombol home, ada indikator garis di tepi bawah yang
+ * menutupi sekitar 34px. Nilai env(safe-area-inset-bottom) hanya tersedia
+ * dari CSS, jadi diukur lewat elemen bantu sekali saja. Perangkat lain
+ * mengembalikan 0.
+ */
+function measureSafeAreaBottom(): number {
+  try {
+    const probe = document.createElement("div");
+    probe.style.cssText =
+      "position:fixed;bottom:0;left:0;width:0;height:env(safe-area-inset-bottom);visibility:hidden;pointer-events:none";
+    document.body.appendChild(probe);
+    const height = probe.getBoundingClientRect().height;
+    probe.remove();
+    return Number.isFinite(height) ? height : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function clampToViewport(pos: Position, safeBottom = 0): Position {
   return {
     x: clamp(pos.x, EDGE_MARGIN, window.innerWidth - BUBBLE_SIZE - EDGE_MARGIN),
-    y: clamp(pos.y, EDGE_MARGIN, window.innerHeight - BUBBLE_SIZE - EDGE_MARGIN),
+    y: clamp(
+      pos.y,
+      EDGE_MARGIN,
+      window.innerHeight - BUBBLE_SIZE - EDGE_MARGIN - safeBottom,
+    ),
   };
 }
 
@@ -91,6 +117,8 @@ export function FloatingChat() {
   const [pos, setPos] = useState<Position>({ x: 0, y: 0 });
   const [open, setOpen] = useState(false);
   const [dragging, setDragging] = useState(false);
+  /** Tinggi indikator home iPhone, 0 di perangkat lain. */
+  const safeBottom = useRef(0);
 
   const chat = useAssistantChat();
 
@@ -113,7 +141,9 @@ export function FloatingChat() {
 
   /* ---------- Muat posisi tersimpan ---------- */
   useEffect(() => {
-    let initial = defaultPosition();
+    safeBottom.current = measureSafeAreaBottom();
+
+    let initial = defaultPosition(safeBottom.current);
 
     try {
       const raw = window.localStorage.getItem(STORAGE_KEY);
@@ -127,7 +157,7 @@ export function FloatingChat() {
       // localStorage bisa diblokir atau isinya rusak. Pakai posisi bawaan.
     }
 
-    setPos(clampToViewport(initial));
+    setPos(clampToViewport(initial, safeBottom.current));
     setMounted(true);
   }, []);
 
@@ -136,11 +166,17 @@ export function FloatingChat() {
     if (!mounted) return;
 
     function onResize() {
-      setPos((prev) => clampToViewport(prev));
+      setPos((prev) => clampToViewport(prev, safeBottom.current));
     }
 
     window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
+    // orientationchange perlu didengarkan terpisah: sebagian peramban ponsel
+    // tidak selalu memicu resize saat perangkat diputar.
+    window.addEventListener("orientationchange", onResize);
+    return () => {
+      window.removeEventListener("resize", onResize);
+      window.removeEventListener("orientationchange", onResize);
+    };
   }, [mounted]);
 
   const persist = useCallback((next: Position) => {
@@ -160,7 +196,7 @@ export function FloatingChat() {
           ? EDGE_MARGIN
           : window.innerWidth - BUBBLE_SIZE - EDGE_MARGIN;
 
-      return clampToViewport({ x: snappedX, y: current.y });
+      return clampToViewport({ x: snappedX, y: current.y }, safeBottom.current);
     },
     [],
   );
@@ -205,7 +241,7 @@ export function FloatingChat() {
       setOpen(false);
     }
 
-    setPos(clampToViewport({ x: nextX, y: nextY }));
+    setPos(clampToViewport({ x: nextX, y: nextY }, safeBottom.current));
   }
 
   function onPointerUp(event: ReactPointerEvent<HTMLButtonElement>) {
@@ -244,7 +280,10 @@ export function FloatingChat() {
 
     event.preventDefault();
     setPos((prev) => {
-      const next = clampToViewport({ x: prev.x + delta.x, y: prev.y + delta.y });
+      const next = clampToViewport(
+        { x: prev.x + delta.x, y: prev.y + delta.y },
+        safeBottom.current,
+      );
       persist(next);
       return next;
     });
@@ -295,8 +334,8 @@ export function FloatingChat() {
     ? {
         left: EDGE_MARGIN / 2,
         right: EDGE_MARGIN / 2,
-        bottom: EDGE_MARGIN / 2,
-        maxHeight: "min(78vh, 560px)",
+        // Angkat di atas indikator home iPhone agar kolom tulis tidak tertutup.
+        bottom: EDGE_MARGIN / 2 + safeBottom.current,
       }
     : {
         left: onLeftHalf
@@ -331,7 +370,13 @@ export function FloatingChat() {
           role="dialog"
           aria-label="Asisten TradeLink"
           style={panelStyle}
-          className="fixed z-[70] flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_20px_60px_-12px_rgb(15_40_70/0.35)]"
+          className={cn(
+            "fixed z-[70] flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white",
+            "shadow-[0_20px_60px_-12px_rgb(15_40_70/0.35)]",
+            // Batas tinggi lembar bawah memakai dvh agar tidak terpotong
+            // bilah alamat peramban ponsel.
+            isNarrow && "max-h-sheet",
+          )}
         >
           {/* Header */}
           <div className="flex items-center gap-2.5 border-b border-slate-200 bg-gradient-to-r from-brand-700 to-navy-900 px-4 py-3">
@@ -356,7 +401,7 @@ export function FloatingChat() {
                 onClick={chat.reset}
                 title="Mulai percakapan baru"
                 aria-label="Mulai percakapan baru"
-                className="grid h-8 w-8 place-items-center rounded-lg text-white/80 transition-colors hover:bg-white/15 hover:text-white"
+                className="grid h-9 w-9 place-items-center rounded-lg text-white/80 transition-colors hover:bg-white/15 hover:text-white sm:h-8 sm:w-8"
               >
                 <svg
                   viewBox="0 0 24 24"
@@ -378,7 +423,7 @@ export function FloatingChat() {
               href="/asisten"
               title="Buka di halaman penuh"
               aria-label="Buka di halaman penuh"
-              className="grid h-8 w-8 place-items-center rounded-lg text-white/80 transition-colors hover:bg-white/15 hover:text-white"
+              className="grid h-9 w-9 place-items-center rounded-lg text-white/80 transition-colors hover:bg-white/15 hover:text-white sm:h-8 sm:w-8"
             >
               <svg
                 viewBox="0 0 24 24"
@@ -401,7 +446,7 @@ export function FloatingChat() {
                 bubbleRef.current?.focus();
               }}
               aria-label="Tutup asisten"
-              className="grid h-8 w-8 place-items-center rounded-lg text-white/80 transition-colors hover:bg-white/15 hover:text-white"
+              className="grid h-9 w-9 place-items-center rounded-lg text-white/80 transition-colors hover:bg-white/15 hover:text-white sm:h-8 sm:w-8"
             >
               <svg
                 viewBox="0 0 24 24"
@@ -528,7 +573,7 @@ export function FloatingChat() {
                   type="submit"
                   disabled={!chat.input.trim()}
                   aria-label="Kirim pertanyaan"
-                  className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-brand-600 text-white transition-colors hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-40"
+                  className="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-brand-600 text-white transition-colors hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-40 sm:h-9 sm:w-9"
                 >
                   <svg
                     viewBox="0 0 24 24"

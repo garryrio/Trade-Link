@@ -61,7 +61,7 @@ export function ChatPanel({ initialQuestion }: { initialQuestion?: string }) {
     <div className="grid gap-6 lg:grid-cols-3">
       {/* ================= PERCAKAPAN ================= */}
       <div className="lg:col-span-2">
-        <div className="card flex h-[clamp(28rem,68vh,44rem)] flex-col overflow-hidden">
+        <div className="card h-chat-panel flex flex-col overflow-hidden">
           {/* Header */}
           <div className="flex items-center justify-between gap-3 border-b border-slate-200 bg-slate-50/70 px-5 py-3.5">
             <div className="flex items-center gap-3">

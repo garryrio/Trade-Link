@@ -228,7 +228,134 @@ export function PriceTable({ initialPrices, initialSummary }: Props) {
         />
       ) : (
         <div className="card overflow-hidden">
-          <div className="scrollbar-slim overflow-x-auto">
+          {/* ============ Layar ponsel: daftar kartu ============
+              Tabel enam kolom tidak mungkin dibaca di lebar 390px tanpa
+              menggulir ke samping terus-menerus. Data yang sama disusun
+              ulang menjadi kartu bertumpuk. */}
+          <ul className="divide-y divide-slate-200 md:hidden">
+            {filtered.map((item) => {
+              const up = item.changePercent >= 0;
+              const flash = flashes.get(item.id);
+              const source = SOURCE_BY_ID.get(item.id);
+
+              const span = item.high52w - item.low52w || 1;
+              const position = Math.min(
+                100,
+                Math.max(0, ((item.price - item.low52w) / span) * 100),
+              );
+
+              return (
+                <li
+                  key={item.id}
+                  className={cn(
+                    "px-4 py-4",
+                    flash === "up" && "flash-up",
+                    flash === "down" && "flash-down",
+                  )}
+                >
+                  {/* Nama dan harga */}
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="font-medium text-navy-900">{item.name}</p>
+                      <p className="mt-0.5 text-xs text-slate-500">
+                        {item.market}
+                      </p>
+                      <p className="mt-0.5 font-mono text-xs text-slate-500">
+                        HS {item.hsCode}
+                      </p>
+                    </div>
+
+                    <div className="shrink-0 text-right">
+                      <p className="font-semibold text-navy-900 tabular-nums">
+                        {formatNumber(item.price, item.price < 10 ? 3 : 2)}
+                      </p>
+                      <p className="text-xs text-slate-500">{item.priceUnit}</p>
+                      <p
+                        className={cn(
+                          "mt-1 inline-flex items-center gap-1 text-sm font-semibold tabular-nums",
+                          up
+                            ? "text-[var(--color-up)]"
+                            : "text-[var(--color-down)]",
+                        )}
+                      >
+                        <svg
+                          viewBox="0 0 24 24"
+                          className={cn("h-3 w-3", !up && "rotate-180")}
+                          fill="currentColor"
+                          aria-hidden="true"
+                        >
+                          <path d="M12 5l7 9h-14z" />
+                        </svg>
+                        {formatPercent(item.changePercent)}
+                        <span className="sr-only">
+                          {up ? "naik" : "turun"} dibanding penutupan sebelumnya
+                        </span>
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Tren dan rentang 52 pekan */}
+                  <div className="mt-3 flex items-end gap-4">
+                    <div className="min-w-0 flex-1">
+                      <div className="relative h-1.5 rounded-full bg-slate-200">
+                        <span
+                          className="absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-brand-600 shadow-sm"
+                          style={{ left: `${position}%` }}
+                          aria-hidden="true"
+                        />
+                      </div>
+                      <div className="mt-1.5 flex justify-between text-xs text-slate-500">
+                        <span>
+                          {formatNumber(item.low52w, item.price < 10 ? 2 : 0)}
+                        </span>
+                        <span className="text-[10px] tracking-wide uppercase">
+                          rentang 52 pekan
+                        </span>
+                        <span>
+                          {formatNumber(item.high52w, item.price < 10 ? 2 : 0)}
+                        </span>
+                      </div>
+                    </div>
+
+                    <Sparkline
+                      data={item.history}
+                      positive={up}
+                      width={72}
+                      height={28}
+                      label={`Tren harga ${item.name}`}
+                    />
+                  </div>
+
+                  {source && (
+                    <a
+                      href={source.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-brand-700"
+                    >
+                      Sumber: {source.label}
+                      <svg
+                        viewBox="0 0 24 24"
+                        className="h-3 w-3"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.4"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        aria-hidden="true"
+                      >
+                        <path d="M7 17 17 7M9 7h8v8" />
+                      </svg>
+                      <span className="sr-only">(buka di tab baru)</span>
+                    </a>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+
+          {/* ============ Layar lebar: tabel ============ */}
+          <div className="scrollbar-slim hidden overflow-x-auto md:block">
             <table className="w-full min-w-[920px] text-sm">
               <caption className="sr-only">
                 Harga komoditas simulasi, diperbarui setiap 15 detik

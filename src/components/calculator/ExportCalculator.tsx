@@ -110,6 +110,41 @@ export function ExportCalculator() {
     <div className="grid gap-6 lg:grid-cols-5">
       {/* ================= INPUT ================= */}
       <div className="space-y-5 lg:col-span-3">
+        {/* Ringkasan yang menempel di atas, hanya untuk layar kecil.
+            Alasannya sama seperti pada kalkulator impor: di ponsel hasil
+            berada jauh di bawah input, sehingga tidak terpantau saat diubah. */}
+        <div className="sticky top-16 z-20 rounded-xl bg-gradient-to-r from-brand-700 to-navy-900 px-4 py-3 shadow-lg lg:hidden">
+          {result.invalid ? (
+            <p className="text-xs leading-relaxed text-amber-200">
+              Margin dan Bea Keluar terlalu besar, harga belum bisa dihitung.
+            </p>
+          ) : (
+            <div className="flex items-end justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-[10px] font-semibold tracking-wider text-brand-200 uppercase">
+                  Harga {form.incoterm} per {unit}
+                </p>
+                <p className="truncate text-lg font-bold text-white tabular-nums">
+                  {rate > 0
+                    ? formatMoney(result.quotedPricePerUnitUSD, "USD")
+                    : "-"}
+                </p>
+                <p className="truncate text-[11px] text-brand-100/80 tabular-nums">
+                  {formatIDR(result.quotedPricePerUnitIDR)}
+                </p>
+              </div>
+              <div className="shrink-0 text-right">
+                <p className="text-[10px] font-semibold tracking-wider text-brand-200 uppercase">
+                  Laba kotor
+                </p>
+                <p className="text-sm font-bold text-white tabular-nums">
+                  {formatPercent(result.grossProfitPercent)}
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+
         <FieldGroup
           title="Barang & harga pokok"
           description="Hitung dari biaya sebenarnya, bukan dari harga jual lokal. Ekspor punya pos biaya yang tidak ada di penjualan domestik."

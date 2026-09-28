@@ -243,7 +243,7 @@ export function QualityDocsField({
                           aria-pressed={doc.mandatory}
                           onClick={() => setMandatory(doc.id, true)}
                           className={cn(
-                            "px-2.5 py-1 text-xs font-semibold transition-colors",
+                            "px-3 py-2 text-xs font-semibold transition-colors sm:px-2.5 sm:py-1",
                             doc.mandatory
                               ? "bg-brand-600 text-white"
                               : "bg-white text-slate-600 hover:bg-slate-50",
@@ -256,7 +256,7 @@ export function QualityDocsField({
                           aria-pressed={!doc.mandatory}
                           onClick={() => setMandatory(doc.id, false)}
                           className={cn(
-                            "border-l border-slate-300 px-2.5 py-1 text-xs font-semibold transition-colors",
+                            "border-l border-slate-300 px-3 py-2 text-xs font-semibold transition-colors sm:px-2.5 sm:py-1",
                             !doc.mandatory
                               ? "bg-slate-600 text-white"
                               : "bg-white text-slate-600 hover:bg-slate-50",
@@ -270,7 +270,7 @@ export function QualityDocsField({
                         type="button"
                         onClick={() => remove(doc.id)}
                         aria-label={`Hapus ${doc.name}`}
-                        className="grid h-7 w-7 place-items-center rounded-lg text-slate-400 transition-colors hover:bg-red-50 hover:text-red-600"
+                        className="grid h-9 w-9 place-items-center rounded-lg text-slate-400 transition-colors hover:bg-red-50 hover:text-red-600 sm:h-7 sm:w-7"
                       >
                         <svg
                           viewBox="0 0 24 24"

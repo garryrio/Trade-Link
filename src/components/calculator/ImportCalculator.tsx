@@ -112,6 +112,31 @@ export function ImportCalculator() {
     <div className="grid gap-6 lg:grid-cols-5">
       {/* ================= INPUT ================= */}
       <div className="space-y-5 lg:col-span-3">
+        {/* Ringkasan yang menempel di atas, hanya untuk layar kecil.
+            Di layar lebar hasil sudah terlihat di kolom kanan, tapi di ponsel
+            hasil berada jauh di bawah seluruh input sehingga angkanya tidak
+            terpantau saat nilai diubah. Nilai 4rem menyamai tinggi navbar. */}
+        <div className="sticky top-16 z-20 rounded-xl bg-gradient-to-r from-brand-700 to-navy-900 px-4 py-3 shadow-lg lg:hidden">
+          <div className="flex items-end justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-[10px] font-semibold tracking-wider text-brand-200 uppercase">
+                Total sampai gudang
+              </p>
+              <p className="truncate text-lg font-bold text-white tabular-nums">
+                {formatIDR(result.landedCostIDR)}
+              </p>
+            </div>
+            <div className="shrink-0 text-right">
+              <p className="text-[10px] font-semibold tracking-wider text-brand-200 uppercase">
+                Per {unit}
+              </p>
+              <p className="text-sm font-bold text-white tabular-nums">
+                {formatIDR(result.costPerUnitIDR)}
+              </p>
+            </div>
+          </div>
+        </div>
+
         <FieldGroup
           title="Barang & nilai transaksi"
           description="Masukkan harga sesuai kesepakatan dengan pemasok. Kalau harga yang Anda dapat sudah CIF, isi ongkos angkut dan asuransi dengan 0."

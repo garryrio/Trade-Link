@@ -15,6 +15,17 @@ import type { Listing, ListingDraft } from "@/lib/types";
    diubah saat migrasi.
 
    Modul ini HANYA boleh dipakai dari Server Component atau Route Handler.
+
+   PERINGATAN KHUSUS DEPLOYMENT SERVERLESS (mis. Vercel)
+   -----------------------------------------------------
+   Di lingkungan serverless, setiap permintaan bisa ditangani instance yang
+   berbeda, dan instance dimatikan setelah menganggur. Akibatnya postingan
+   yang baru dibuat sering TIDAK terlihat pada permintaan berikutnya, bukan
+   hanya hilang setelah restart. Perilakunya akan tampak acak dan
+   membingungkan pengguna.
+
+   Karena itu halaman Buat Postingan menampilkan peringatan tambahan saat
+   berjalan di Vercel. Lihat `isEphemeralStore` di bawah.
    ============================================================ */
 
 interface GlobalWithStore {
@@ -151,6 +162,17 @@ export function createListing(draft: ListingDraft): Listing {
 
   db().unshift(listing);
   return listing;
+}
+
+/**
+ * true bila penyimpanan hampir pasti tidak konsisten antar permintaan.
+ *
+ * Dipakai untuk memperingatkan pengguna secara jujur, bukan membiarkan
+ * mereka menyangka postingannya tersimpan padahal tidak. Variabel VERCEL
+ * diset otomatis oleh platform pada setiap deployment.
+ */
+export function isEphemeralStore(): boolean {
+  return process.env.VERCEL === "1";
 }
 
 /** Angka ringkasan untuk halaman beranda dan marketplace. */

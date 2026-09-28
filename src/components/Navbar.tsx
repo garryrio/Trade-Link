@@ -75,7 +75,7 @@ export function Navbar() {
             aria-expanded={open}
             aria-controls="mobile-nav"
             aria-label={open ? "Tutup menu navigasi" : "Buka menu navigasi"}
-            className="grid h-10 w-10 place-items-center rounded-lg border border-slate-300 text-navy-800 transition-colors hover:bg-slate-100 lg:hidden"
+            className="grid h-11 w-11 place-items-center rounded-lg border border-slate-300 text-navy-800 transition-colors hover:bg-slate-100 lg:hidden"
           >
             {open ? (
               <svg

@@ -29,6 +29,21 @@ export const viewport: Viewport = {
   themeColor: "#2563eb",
   width: "device-width",
   initialScale: 1,
+  /**
+   * viewportFit "cover" membuat halaman mengisi seluruh layar termasuk area
+   * di sekitar lekukan kamera. Ini SYARAT agar env(safe-area-inset-*) di CSS
+   * bernilai selain nol; tanpa ini, penyesuaian area aman tidak berpengaruh.
+   *
+   * Konsekuensinya konten bisa tertutup indikator home, jadi elemen yang
+   * menempel di tepi bawah wajib memakai padding area aman. Lihat utilitas
+   * .pb-safe di globals.css dan penyesuaian di FloatingChat.
+   */
+  viewportFit: "cover",
+  /**
+   * maximumScale sengaja TIDAK dibatasi. Mengunci zoom memang menghilangkan
+   * beberapa gangguan tata letak, tapi merampas kemampuan memperbesar teks
+   * bagi pengguna dengan penglihatan terbatas.
+   */
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

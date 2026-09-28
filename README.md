@@ -114,6 +114,118 @@ Semua fitur lain berjalan tanpa API key. Kalau key belum diisi, halaman
 
 ---
 
+## Deploy ke Vercel
+
+### Langkah
+
+1. **Push ke GitHub** (atau GitLab/Bitbucket).
+
+2. Buka <https://vercel.com/new>, pilih repositori ini. Vercel mendeteksi
+   Next.js sendiri, jadi build command dan output directory tidak perlu diubah.
+
+3. **Isi environment variable** sebelum deploy pertama, di bagian
+   *Environment Variables*:
+
+   | Nama | Nilai | Wajib |
+   | --- | --- | --- |
+   | `GEMINI_API_KEY` | API key dari [Google AI Studio](https://aistudio.google.com/apikey) | Hanya untuk asisten AI |
+   | `GEMINI_MODEL` | `gemini-3.8-flash` | Opsional |
+   | `GEMINI_THINKING_LEVEL` | `low` | Opsional |
+
+   Centang semua environment (Production, Preview, Development) agar preview
+   deployment juga berfungsi.
+
+   **Jangan** memberi prefix `NEXT_PUBLIC_` pada `GEMINI_API_KEY`. Prefix itu
+   membuat nilainya ikut dikirim ke browser, artinya siapa pun bisa membaca
+   dan memakai kuota Anda.
+
+4. Klik **Deploy**.
+
+Tanpa `GEMINI_API_KEY`, seluruh fitur lain tetap berjalan normal; hanya
+halaman asisten dan bubble melayang yang menampilkan petunjuk pengisian.
+
+### Isi `vercel.json`
+
+- **`regions: ["sin1"]`** — menjalankan fungsi server di Singapura, wilayah
+  terdekat dengan Indonesia. Ini memotong latensi puluhan milidetik per
+  permintaan dibanding region bawaan Amerika, dan terasa karena halaman
+  Harga melakukan polling tiap 15 detik.
+- **Header keamanan** — `nosniff`, `Referrer-Policy`, `X-Frame-Options`, dan
+  `Permissions-Policy` yang menutup akses kamera, mikrofon, dan lokasi karena
+  aplikasi ini tidak memerlukannya.
+
+### Yang HARUS diketahui sebelum membagikan tautannya
+
+**Postingan tidak akan tersimpan dengan benar.** `src/lib/store.ts` menyimpan
+data di memori proses. Di serverless, setiap permintaan bisa ditangani instance
+berbeda dan instance dimatikan saat menganggur. Jadi postingan yang baru dibuat
+sering tidak muncul di permintaan berikutnya, bukan hanya hilang saat restart.
+Perilakunya tampak acak.
+
+Karena itu halaman Buat Postingan otomatis menampilkan peringatan saat
+mendeteksi `VERCEL=1`. Demo tetap bisa dipakai untuk memperlihatkan alur dan
+tampilan, tapi jangan dipakai untuk penawaran sungguhan.
+
+Untuk memperbaikinya, ganti isi fungsi di `store.ts` dengan query database.
+Pilihan yang paling sedikit gesekannya dengan Vercel: Vercel Postgres, Neon,
+atau Supabase. Tidak ada file lain yang perlu diubah.
+
+**Perhatikan kuota fungsi.** Semua halaman memakai `dynamic = "force-dynamic"`
+sehingga selalu dirender di server, dan halaman Harga memanggil `/api/prices`
+setiap 15 detik per tab yang terbuka. Satu tab yang dibiarkan terbuka satu jam
+menghasilkan 240 pemanggilan fungsi. Pada paket gratis, ini bisa menghabiskan
+kuota lebih cepat dari dugaan. Bila jadi masalah, perlebar jeda `POLL_MS` di
+`src/components/prices/PriceTable.tsx`.
+
+### Deploy dari terminal
+
+```powershell
+npx vercel@latest          # preview
+npx vercel@latest --prod   # produksi
+```
+
+---
+
+## Penyesuaian untuk layar ponsel
+
+Beberapa hal yang ditangani khusus, karena tidak otomatis benar:
+
+**Zoom paksa di iOS.** Safari memperbesar tampilan saat field yang difokuskan
+berukuran di bawah 16px, dan zoom itu tidak kembali sendiri. Karena itu
+`.field-input` memakai 16px di layar kecil lalu 14px dari breakpoint `sm`
+ke atas.
+
+**Tabel harga.** Tabel enam kolom tidak mungkin dibaca di lebar 390px. Di bawah
+breakpoint `md`, data yang sama dirender sebagai kartu bertumpuk, lengkap
+dengan sparkline dan penanda rentang 52 pekan.
+
+**Hasil kalkulator.** Di ponsel, hasil hitungan berada jauh di bawah seluruh
+input sehingga tidak terpantau saat nilai diubah. Ditambahkan ringkasan yang
+menempel di bawah navbar, hanya tampil di layar kecil.
+
+**Satuan tinggi.** `vh` di peramban ponsel menghitung tinggi termasuk bilah
+alamat, sehingga panel setinggi `100vh` terpotong lalu melompat saat bilah itu
+menyembunyikan diri. Utilitas `.h-chat-panel` dan `.max-h-sheet` memakai `dvh`
+dengan `vh` sebagai cadangan.
+
+**Area aman perangkat.** `viewportFit: "cover"` di `layout.tsx` mengaktifkan
+`env(safe-area-inset-*)`, yang tanpa itu selalu bernilai nol. Bubble asisten
+dan lembar chat bawah mengukur tinggi indikator home iPhone lalu menyesuaikan
+posisinya.
+
+**Area sentuh.** Tombol ikon diperbesar di layar kecil lalu mengecil dari
+breakpoint `sm` ke atas, mis. `h-9 w-9 sm:h-7 sm:w-7`. Pendekatan memperluas
+area tekan lewat pseudo-element 44px sempat dicoba lalu dibatalkan: pada tombol
+yang berdempetan, area yang diperluas saling tumpang tindih sehingga tepi satu
+tombol memicu tombol sebelahnya. Alasannya dicatat sebagai komentar di
+`globals.css` agar tidak diulang.
+
+**Zoom tidak dikunci.** `maximumScale` sengaja dibiarkan bebas. Mengunci zoom
+memang merapikan tata letak, tapi merampas kemampuan memperbesar teks bagi
+pengguna dengan penglihatan terbatas.
+
+---
+
 ## Struktur project
 
 ```
