@@ -117,24 +117,27 @@ export function ImportCalculator() {
             hasil berada jauh di bawah seluruh input sehingga angkanya tidak
             terpantau saat nilai diubah. Nilai 4rem menyamai tinggi navbar. */}
         <div className="sticky top-16 z-20 rounded-xl bg-gradient-to-r from-brand-700 to-navy-900 px-4 py-3 shadow-lg lg:hidden">
-          <div className="flex items-end justify-between gap-3">
+          {/* Dua kolom setara, keduanya boleh membungkus. Sebelumnya nilai
+              total dipotong dengan `truncate`, dan nilai uang yang terpotong
+              di tengah lebih menyesatkan daripada tidak ditampilkan. */}
+          <dl className="grid grid-cols-2 gap-x-3 gap-y-1">
             <div className="min-w-0">
-              <p className="text-[10px] font-semibold tracking-wider text-brand-200 uppercase">
+              <dt className="text-[10px] font-semibold tracking-wider text-brand-200 uppercase">
                 Total sampai gudang
-              </p>
-              <p className="truncate text-lg font-bold text-white tabular-nums">
+              </dt>
+              <dd className="text-sm leading-tight font-bold break-words text-white tabular-nums">
                 {formatIDR(result.landedCostIDR)}
-              </p>
+              </dd>
             </div>
-            <div className="shrink-0 text-right">
-              <p className="text-[10px] font-semibold tracking-wider text-brand-200 uppercase">
+            <div className="min-w-0 text-right">
+              <dt className="text-[10px] font-semibold tracking-wider text-brand-200 uppercase">
                 Per {unit}
-              </p>
-              <p className="text-sm font-bold text-white tabular-nums">
+              </dt>
+              <dd className="text-sm leading-tight font-bold break-words text-white tabular-nums">
                 {formatIDR(result.costPerUnitIDR)}
-              </p>
+              </dd>
             </div>
-          </div>
+          </dl>
         </div>
 
         <FieldGroup
@@ -368,7 +371,10 @@ export function ImportCalculator() {
               <p className="text-xs font-semibold tracking-wider text-brand-200 uppercase">
                 Total biaya sampai gudang
               </p>
-              <p className="mt-1.5 text-3xl font-bold text-white tabular-nums">
+              {/* Nilai landed cost bisa mencapai belasan karakter. Pada 30px
+                  di layar 375px angka itu melewati lebar kartu, jadi ukurannya
+                  naik bertahap dan diizinkan membungkus. */}
+              <p className="mt-1.5 text-2xl font-bold break-words text-white tabular-nums sm:text-3xl">
                 {formatIDR(result.landedCostIDR)}
               </p>
               <p className="mt-1 text-sm text-brand-100/85">
@@ -376,7 +382,9 @@ export function ImportCalculator() {
               </p>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 p-5">
+            {/* Satu kolom di ponsel: dua kolom menyisakan sekitar 145px per
+                kartu, lebih sempit daripada angka rupiah yang ditampilkan. */}
+            <div className="grid gap-3 p-5 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
               <ResultStat
                 label={`Biaya per ${unit}`}
                 value={formatIDR(result.costPerUnitIDR)}

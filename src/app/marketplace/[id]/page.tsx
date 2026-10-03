@@ -17,10 +17,13 @@ import {
 } from "@/lib/format";
 import { getQualityDoc } from "@/data/qualityDocuments";
 import { getListingById, getRelatedListings } from "@/lib/store";
+import { estimateTransit, formatTransitRange } from "@/data/transitTimes";
 import {
   CATEGORY_META,
+  CONTAINER_META,
   INCOTERMS,
   LISTING_KIND_META,
+  SHIPPING_MODE_META,
   STATUS_META,
   UNIT_LABELS,
   UNIT_SUFFIX,
@@ -62,6 +65,14 @@ export default async function ListingDetailPage({
   const incotermInfo = INCOTERMS.find((i) => i.code === listing.incoterm);
   const related = getRelatedListings(listing);
   const remainingDays = listing.deadline ? daysUntil(listing.deadline) : null;
+
+  /* null bila tujuannya masih "Terbuka (global)". Dalam kasus itu tidak ada
+     satu rute yang bisa diperkirakan, dan menampilkan angka apa pun akan
+     menyesatkan. */
+  const transit = estimateTransit(
+    listing.destinationCountry,
+    listing.shippingMode,
+  );
 
   // Pertanyaan siap-pakai untuk dikirim ke asisten AI.
   const assistantPrompt = isSupply
@@ -195,12 +206,52 @@ export default async function ListingDetailPage({
                       </>
                     }
                   />
+                  <SpecRow
+                    label="Metode pengiriman"
+                    value={
+                      <>
+                        <span className="font-semibold">
+                          {SHIPPING_MODE_META[listing.shippingMode].label}
+                        </span>
+                        <span className="text-slate-500">
+                          {" "}
+                          - {SHIPPING_MODE_META[listing.shippingMode].name}
+                        </span>
+                        {listing.containerType && (
+                          <span className="text-slate-500">
+                            {", kontainer "}
+                            {CONTAINER_META[listing.containerType].label}
+                          </span>
+                        )}
+                      </>
+                    }
+                  />
                   <SpecRow label="Negara asal barang" value={listing.originCountry} />
                   <SpecRow label="Negara tujuan" value={listing.destinationCountry} />
                   <SpecRow
                     label={isSupply ? "Pelabuhan muat" : "Pelabuhan bongkar"}
                     value={listing.port}
                   />
+                  {transit && (
+                    <SpecRow
+                      label="Perkiraan waktu sampai"
+                      value={
+                        <>
+                          <span className="font-semibold tabular-nums">
+                            {formatTransitRange(
+                              transit.totalMinDays,
+                              transit.totalMaxDays,
+                            )}
+                          </span>
+                          <span className="text-slate-500">
+                            {" "}
+                            dari gudang penjual sampai diterima pembeli di{" "}
+                            {transit.country}. Perkiraan, bukan jaminan.
+                          </span>
+                        </>
+                      }
+                    />
+                  )}
                   <SpecRow label="Syarat pembayaran" value={listing.paymentTerms} />
                   {listing.capacityNote && (
                     <SpecRow label="Kapasitas" value={listing.capacityNote} />

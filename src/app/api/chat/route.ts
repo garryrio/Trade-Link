@@ -18,6 +18,25 @@ export const dynamic = "force-dynamic";
 const DEFAULT_MODEL = "gemini-3.1-flash-lite";
 const DEFAULT_THINKING_LEVEL = "low";
 
+/* Model cadangan dipakai berurutan kalau model utama menolak karena sedang
+   kelebihan beban (503) atau tidak dikenali (404). Semua kandidat di sini
+   sudah diuji menerima generationConfig.thinkingConfig.thinkingLevel.
+   Catatan: gemini-2.5-* TIDAK dimasukkan karena menolak thinkingLevel. */
+const FALLBACK_MODELS = ["gemini-3.6-flash", "gemini-3.5-flash"];
+
+/** Status yang pantas dicoba ulang: gangguan sesaat, bukan salah permintaan. */
+const RETRYABLE_STATUS = new Set([429, 500, 502, 503, 504]);
+
+/** Percobaan per model, termasuk percobaan pertama. */
+const ATTEMPTS_PER_MODEL = 3;
+
+/** Jeda dasar antar percobaan. Naik berlipat: 400ms, 800ms, 1600ms. */
+const RETRY_BASE_DELAY_MS = 400;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 /** Batas agar satu permintaan tidak membengkak tanpa kendali. */
 const MAX_MESSAGES = 30;
 const MAX_CHARS_PER_MESSAGE = 4_000;
@@ -151,63 +170,70 @@ export async function POST(request: Request) {
   const thinkingLevel =
     process.env.GEMINI_THINKING_LEVEL?.trim() || DEFAULT_THINKING_LEVEL;
 
-  const endpoint =
-    `https://generativelanguage.googleapis.com/v1beta/models/` +
-    `${encodeURIComponent(model)}:streamGenerateContent?alt=sse`;
+  const payload = JSON.stringify({
+    systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
+    contents: messages.map((m) => ({
+      role: m.role,
+      parts: [{ text: m.content }],
+    })),
+    generationConfig: {
+      maxOutputTokens: 2_048,
+      // Catatan: model Gemini 3 ke atas tidak menerima temperature,
+      // topP, topK, atau candidateCount. Gunakan thinkingLevel.
+      thinkingConfig: { thinkingLevel },
+    },
+  });
 
-  let upstream: Response;
-  try {
-    upstream = await fetch(endpoint, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        // Key dikirim lewat header, jadi tidak pernah muncul di URL atau log.
-        "x-goog-api-key": apiKey,
-      },
-      body: JSON.stringify({
-        systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
-        contents: messages.map((m) => ({
-          role: m.role,
-          parts: [{ text: m.content }],
-        })),
-        generationConfig: {
-          maxOutputTokens: 2_048,
-          // Catatan: model Gemini 3 ke atas tidak menerima temperature,
-          // topP, topK, atau candidateCount. Gunakan thinkingLevel.
-          thinkingConfig: { thinkingLevel },
-        },
-      }),
-    });
-  } catch {
-    return NextResponse.json(
-      {
-        code: "UPSTREAM_UNREACHABLE",
-        error:
-          "Tidak bisa menghubungi layanan AI. Periksa koneksi internet server lalu coba lagi.",
-      },
-      { status: 502 },
-    );
-  }
+  /* Urutan model yang dicoba: pilihan pengguna dulu, lalu cadangan.
+     Duplikat dibuang supaya tidak membuang percobaan pada model yang sama. */
+  const modelChain = [model, ...FALLBACK_MODELS].filter(
+    (name, index, all) => all.indexOf(name) === index,
+  );
 
-  if (!upstream.ok || !upstream.body) {
-    // Catat detail di server untuk penelusuran, tapi jangan kirim ke client.
-    const detail = await upstream.text().catch(() => "");
+  const attempt = await requestGemini(modelChain, payload, apiKey);
+
+  if (!attempt.body) {
+    const { status, model: failedModel, detail } = attempt;
+
     console.error(
-      `[api/chat] Gemini menolak permintaan. status=${upstream.status} model=${model} detail=${detail.slice(0, 500)}`,
+      `[api/chat] Semua percobaan gagal. status=${status} model_terakhir=${failedModel} ` +
+        `dicoba=${attempt.tried.join(",")} detail=${detail.slice(0, 500)}`,
     );
+
+    // 0 berarti permintaan tidak pernah sampai ke Google.
+    if (status === 0) {
+      return NextResponse.json(
+        {
+          code: "UPSTREAM_UNREACHABLE",
+          error:
+            "Tidak bisa menghubungi layanan AI. Periksa koneksi internet server lalu coba lagi.",
+        },
+        { status: 502 },
+      );
+    }
 
     const message =
-      upstream.status === 400
-        ? `Permintaan ditolak layanan AI. Periksa apakah nama model "${model}" benar dan didukung API key Anda.`
-        : upstream.status === 401 || upstream.status === 403
+      status === 400
+        ? `Permintaan ditolak layanan AI. Periksa apakah nama model "${failedModel}" benar dan didukung API key Anda.`
+        : status === 401 || status === 403
           ? "API key ditolak. Pastikan GEMINI_API_KEY masih berlaku dan punya akses ke model ini."
-          : upstream.status === 429
-            ? "Kuota permintaan sedang penuh. Tunggu sebentar lalu coba lagi."
-            : "Layanan AI sedang bermasalah. Coba lagi beberapa saat lagi.";
+          : status === 404
+            ? `Model "${failedModel}" tidak ditemukan, begitu juga model cadangan. Periksa nilai GEMINI_MODEL.`
+            : status === 429
+              ? "Kuota permintaan sedang penuh. Tunggu sebentar lalu coba lagi."
+              : status === 503
+                ? "Layanan AI sedang penuh permintaan. Sudah dicoba ulang beberapa kali, tapi tetap belum tersedia. Coba lagi sebentar lagi."
+                : "Layanan AI sedang bermasalah. Coba lagi beberapa saat lagi.";
 
     return NextResponse.json(
       { code: "UPSTREAM_ERROR", error: message },
       { status: 502 },
+    );
+  }
+
+  if (attempt.model !== model) {
+    console.warn(
+      `[api/chat] Model "${model}" tidak tersedia, dilayani oleh cadangan "${attempt.model}".`,
     );
   }
 
@@ -218,7 +244,7 @@ export async function POST(request: Request) {
      sudah lengkap (diakhiri newline). Sisanya menunggu chunk berikutnya. */
   const encoder = new TextEncoder();
   const decoder = new TextDecoder();
-  const reader = upstream.body.getReader();
+  const reader = attempt.body.getReader();
 
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
@@ -271,6 +297,108 @@ export async function POST(request: Request) {
   });
 }
 
+interface GeminiAttempt {
+  /** Aliran SSE kalau berhasil, null kalau semua percobaan gagal. */
+  body: ReadableStream<Uint8Array> | null;
+  /** Model yang akhirnya melayani, atau model terakhir yang gagal. */
+  model: string;
+  /** Status HTTP terakhir. 0 berarti permintaan tidak pernah terkirim. */
+  status: number;
+  /** Isi balasan error dari Google, untuk log server saja. */
+  detail: string;
+  /** Daftar model yang sudah dicoba, untuk log. */
+  tried: string[];
+}
+
+/**
+ * Panggil Gemini dengan percobaan ulang dan model cadangan.
+ *
+ * Kenapa ini perlu: Gemini kadang membalas 503 UNAVAILABLE ("high demand")
+ * secara sesaat. Tanpa percobaan ulang, satu balasan 503 membuat chat
+ * tampak rusak padahal API key dan nama model sudah benar.
+ *
+ * Aturan per model:
+ *   - Status 429/5xx  -> tunggu sebentar lalu coba lagi, sampai batas percobaan.
+ *   - Status 404      -> model memang tidak ada, langsung lompat ke cadangan.
+ *   - Status 400/401/403 -> kesalahan permintaan atau kredensial. Mencoba model
+ *     lain tidak akan menolong, jadi berhenti dan laporkan.
+ */
+async function requestGemini(
+  modelChain: string[],
+  payload: string,
+  apiKey: string,
+): Promise<GeminiAttempt> {
+  const tried: string[] = [];
+  let lastStatus = 0;
+  let lastDetail = "";
+  let lastModel = modelChain[0] ?? "";
+
+  for (const candidate of modelChain) {
+    tried.push(candidate);
+    lastModel = candidate;
+
+    const endpoint =
+      `https://generativelanguage.googleapis.com/v1beta/models/` +
+      `${encodeURIComponent(candidate)}:streamGenerateContent?alt=sse`;
+
+    for (let attempt = 1; attempt <= ATTEMPTS_PER_MODEL; attempt += 1) {
+      let response: Response;
+
+      try {
+        response = await fetch(endpoint, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            // Key dikirim lewat header, jadi tidak pernah muncul di URL atau log.
+            "x-goog-api-key": apiKey,
+          },
+          body: payload,
+        });
+      } catch (error) {
+        // Gangguan jaringan juga layak dicoba ulang.
+        lastStatus = 0;
+        lastDetail = error instanceof Error ? error.message : String(error);
+
+        if (attempt < ATTEMPTS_PER_MODEL) {
+          await sleep(RETRY_BASE_DELAY_MS * 2 ** (attempt - 1));
+          continue;
+        }
+        break;
+      }
+
+      if (response.ok && response.body) {
+        return {
+          body: response.body,
+          model: candidate,
+          status: response.status,
+          detail: "",
+          tried,
+        };
+      }
+
+      lastStatus = response.status;
+      lastDetail = await response.text().catch(() => "");
+
+      // Kesalahan permintaan atau kredensial: model lain tidak akan menolong.
+      if (!RETRYABLE_STATUS.has(response.status) && response.status !== 404) {
+        return { body: null, model: candidate, status: lastStatus, detail: lastDetail, tried };
+      }
+
+      // Model tidak ada: percobaan ulang sia-sia, langsung ke cadangan.
+      if (response.status === 404) break;
+
+      if (attempt < ATTEMPTS_PER_MODEL) {
+        console.warn(
+          `[api/chat] ${candidate} balas ${response.status}, percobaan ${attempt}/${ATTEMPTS_PER_MODEL}.`,
+        );
+        await sleep(RETRY_BASE_DELAY_MS * 2 ** (attempt - 1));
+      }
+    }
+  }
+
+  return { body: null, model: lastModel, status: lastStatus, detail: lastDetail, tried };
+}
+
 /**
  * Ambil potongan teks dari payload SSE Gemini.
  *
@@ -308,4 +436,3 @@ function extractText(chunk: string): string {
 
   return output;
 }
-//HELL

@@ -20,9 +20,9 @@ const TABS: {
   },
   {
     value: "ekspor",
-    label: "Susun Harga Ekspor",
+    label: "Lembar Biaya Ekspor",
     description:
-      "Dari harga pokok produksi sampai harga jual FOB, CFR, atau CIF, lengkap dengan titik impas.",
+      "Isi barang, jumlah, kota pengirim, dan kota penerima. Hasilnya rincian biaya dari trucking sampai asuransi kargo, berujung di harga FOB, CFR, dan CIF.",
   },
 ];
 

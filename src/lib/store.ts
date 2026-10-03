@@ -60,12 +60,25 @@ function db(): Listing[] {
  * menulis pemeriksaan defensif di tiap tempat pemakaian.
  */
 function normalize(listing: Listing): Listing {
-  if (
+  const arraysOk =
     Array.isArray(listing.qualityDocuments) &&
-    Array.isArray(listing.certifications)
-  ) {
-    return listing;
-  }
+    Array.isArray(listing.certifications);
+  const shippingOk =
+    typeof listing.shippingMode === "string" &&
+    listing.containerType !== undefined;
+
+  if (arraysOk && shippingOk) return listing;
+
+  // Tebak metode pengiriman dari satuan kuantitas kalau fieldnya belum ada.
+  const unit = listing.unit;
+  const guessedContainer: Listing["containerType"] =
+    unit === "container20"
+      ? "20ft"
+      : unit === "container40"
+        ? "40ft"
+        : unit === "container45"
+          ? "45ft"
+          : null;
 
   return {
     ...listing,
@@ -75,6 +88,12 @@ function normalize(listing: Listing): Listing {
     qualityDocuments: Array.isArray(listing.qualityDocuments)
       ? listing.qualityDocuments
       : [],
+    shippingMode:
+      typeof listing.shippingMode === "string" ? listing.shippingMode : "FCL",
+    containerType:
+      listing.containerType !== undefined
+        ? listing.containerType
+        : guessedContainer,
   };
 }
 
@@ -135,6 +154,8 @@ export function createListing(draft: ListingDraft): Listing {
     price: draft.price,
     currency: draft.currency,
     incoterm: draft.incoterm,
+    shippingMode: draft.shippingMode,
+    containerType: draft.containerType,
     originCountry: draft.originCountry,
     destinationCountry: draft.destinationCountry,
     port: draft.port,

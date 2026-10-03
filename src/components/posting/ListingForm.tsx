@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState, type FormEvent, type ReactNode } from "react";
 import { HsCodeField } from "@/components/posting/HsCodeField";
 import { QualityDocsField } from "@/components/posting/QualityDocsField";
+import { TransitEstimateCard } from "@/components/posting/TransitEstimateCard";
 import { Button } from "@/components/ui/Button";
 import { Callout } from "@/components/ui/Callout";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/Card";
@@ -11,13 +12,20 @@ import { cn } from "@/lib/cn";
 import {
   CATEGORY_KEYS,
   CATEGORY_META,
+  CONTAINER_META,
+  CONTAINER_TYPES,
+  CONTAINER_UNIT,
   CURRENCIES,
   INCOTERMS,
   LISTING_KIND_META,
+  SHIPPING_MODES,
+  SHIPPING_MODE_META,
   UNIT_LABELS,
   type CommodityCategory,
+  type ContainerType,
   type ListingKind,
   type QualityDocRequirement,
+  type ShippingMode,
   type Unit,
 } from "@/lib/types";
 import {
@@ -46,6 +54,8 @@ interface FormState {
   price: string;
   currency: string;
   incoterm: string;
+  shippingMode: ShippingMode;
+  containerType: ContainerType | null;
   originCountry: string;
   destinationCountry: string;
   port: string;
@@ -74,6 +84,8 @@ function initialState(kind: ListingKind): FormState {
     price: "",
     currency: "USD",
     incoterm: supply ? "FOB" : "CIF",
+    shippingMode: "FCL",
+    containerType: "20ft",
     originCountry: supply ? "Indonesia" : "",
     destinationCountry: supply ? "Terbuka (global)" : "Indonesia",
     port: "",
@@ -104,6 +116,48 @@ export function ListingForm({ initialKind }: { initialKind: ListingKind }) {
       if (!(key in prev)) return prev;
       const next = { ...prev };
       delete next[key as keyof FieldErrors];
+      return next;
+    });
+  };
+
+  /**
+   * Ganti metode pengiriman.
+   *
+   * Satuan kuantitas ikut dirapikan supaya tidak pernah berbenturan dengan
+   * metodenya. Kalau dibiarkan, pengguna bisa memilih LCL sambil satuannya
+   * masih "kontainer 40ft", lalu baru tahu salahnya saat form ditolak.
+   * Lebih baik dicegah di sini daripada dilaporkan sebagai error.
+   */
+  const setShippingMode = (mode: ShippingMode) => {
+    setForm((prev) => {
+      const unitIsContainer = prev.unit.startsWith("container");
+
+      if (mode === "FCL") {
+        const containerType = prev.containerType ?? "20ft";
+        return { ...prev, shippingMode: mode, containerType };
+      }
+
+      return {
+        ...prev,
+        shippingMode: mode,
+        containerType: null,
+        unit: unitIsContainer ? ("mt" satisfies Unit) : prev.unit,
+      };
+    });
+    setErrors({});
+  };
+
+  /** Ganti tipe kontainer, dan ikutkan satuan bila satuannya memang kontainer. */
+  const setContainerType = (type: ContainerType) => {
+    setForm((prev) => ({
+      ...prev,
+      containerType: type,
+      unit: prev.unit.startsWith("container") ? CONTAINER_UNIT[type] : prev.unit,
+    }));
+    setErrors((prev) => {
+      const next = { ...prev };
+      delete next.containerType;
+      delete next.unit;
       return next;
     });
   };
@@ -538,6 +592,92 @@ export function ListingForm({ initialKind }: { initialKind: ListingKind }) {
               ))}
             </select>
           </Field>
+
+          <Field
+            id="f-shippingMode"
+            label="Metode pengiriman"
+            error={errors.shippingMode}
+            hint={SHIPPING_MODE_META[form.shippingMode].description}
+            required
+          >
+            <select
+              id="f-shippingMode"
+              value={form.shippingMode}
+              onChange={(e) => setShippingMode(e.target.value as ShippingMode)}
+              className="field-input"
+            >
+              {SHIPPING_MODES.map((mode) => (
+                <option key={mode} value={mode}>
+                  {SHIPPING_MODE_META[mode].label} -{" "}
+                  {SHIPPING_MODE_META[mode].name}
+                </option>
+              ))}
+            </select>
+          </Field>
+
+          {form.shippingMode === "FCL" && (
+            <Field
+              className="sm:col-span-2"
+              id="f-containerType"
+              label="Tipe kontainer"
+              error={errors.containerType}
+              hint={
+                form.containerType
+                  ? CONTAINER_META[form.containerType].description
+                  : undefined
+              }
+              required
+            >
+              <div
+                role="radiogroup"
+                aria-labelledby="f-containerType-label"
+                className="grid gap-2.5 sm:grid-cols-3"
+              >
+                {CONTAINER_TYPES.map((type) => {
+                  const spec = CONTAINER_META[type];
+                  const selected = form.containerType === type;
+
+                  return (
+                    <button
+                      key={type}
+                      type="button"
+                      role="radio"
+                      aria-checked={selected}
+                      onClick={() => setContainerType(type)}
+                      className={cn(
+                        "rounded-xl border-2 px-3 py-2.5 text-left transition-colors",
+                        selected
+                          ? "border-brand-600 bg-brand-50"
+                          : "border-slate-200 hover:border-slate-300",
+                      )}
+                    >
+                      <span
+                        className={cn(
+                          "block font-semibold",
+                          selected ? "text-brand-700" : "text-navy-900",
+                        )}
+                      >
+                        {spec.label}
+                      </span>
+                      <span className="mt-0.5 block text-xs text-slate-600 tabular-nums">
+                        maks {(spec.practicalPayloadKg / 1000).toLocaleString("id-ID")}{" "}
+                        ton, {spec.capacityCbm} m³
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </Field>
+          )}
+
+          {/* Perkiraan waktu kedatangan, ikut berubah mengikuti negara tujuan
+              dan metode pengiriman yang sedang dipilih. */}
+          <div className="sm:col-span-2">
+            <TransitEstimateCard
+              destinationCountry={form.destinationCountry}
+              shippingMode={form.shippingMode}
+            />
+          </div>
 
           <Field
             id="f-port"

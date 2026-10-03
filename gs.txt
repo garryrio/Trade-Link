@@ -1,0 +1,14 @@
+﻿--- file kunci di origin/main ---
+vercel.json : True
+package.json : True
+src/app/globals.css : True
+src/components/prices/PriceTable.tsx : True
+src/components/assistant/FloatingChat.tsx : True
+src/lib/store.ts : True
+--- .env.local ikut ter-push? ---
+ADA di repo: False
+--- commit terakhir di origin ---
+06e5e84 mobile web
+7e18966 overlay chatbot
+--- isi regions di vercel.json yg ter-push ---
+"regions": ["sin1"],

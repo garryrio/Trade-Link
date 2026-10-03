@@ -1,14 +1,19 @@
 import {
   CATEGORY_META,
+  CONTAINER_META,
+  CONTAINER_TYPES,
   CURRENCIES,
   INCOTERMS,
+  SHIPPING_MODES,
   UNIT_LABELS,
   type CommodityCategory,
+  type ContainerType,
   type Currency,
   type Incoterm,
   type ListingDraft,
   type ListingKind,
   type QualityDocRequirement,
+  type ShippingMode,
   type Unit,
 } from "@/lib/types";
 
@@ -152,6 +157,45 @@ export function validateListingDraft(input: unknown): ValidationResult {
     ? (incotermRaw as Incoterm)
     : null;
   if (!incoterm) errors.incoterm = "Pilih Incoterm.";
+
+  // --- Metode pengiriman & tipe kontainer ---
+  const modeRaw = str(raw, "shippingMode");
+  const shippingMode = SHIPPING_MODES.includes(modeRaw as ShippingMode)
+    ? (modeRaw as ShippingMode)
+    : null;
+  if (!shippingMode) errors.shippingMode = "Pilih metode pengiriman.";
+
+  /* Satuan kontainer hanya punya arti pada FCL. Kalau keduanya tidak
+     sejalan, angka kuantitas jadi menyesatkan, jadi ditolak di sini. */
+  const unitContainer: ContainerType | null =
+    unit === "container20"
+      ? "20ft"
+      : unit === "container40"
+        ? "40ft"
+        : unit === "container45"
+          ? "45ft"
+          : null;
+
+  let containerType: ContainerType | null = null;
+
+  if (shippingMode === "FCL") {
+    const containerRaw = str(raw, "containerType");
+    if (!CONTAINER_TYPES.includes(containerRaw as ContainerType)) {
+      errors.containerType = "Pilih tipe kontainer untuk pengiriman FCL.";
+    } else {
+      containerType = containerRaw as ContainerType;
+
+      if (unitContainer && unitContainer !== containerType) {
+        errors.containerType =
+          `Satuan kuantitas memakai ${UNIT_LABELS[unit as Unit]}, ` +
+          `tapi tipe kontainer dipilih ${CONTAINER_META[containerType].label}. Samakan keduanya.`;
+      }
+    }
+  } else if (shippingMode && unitContainer) {
+    errors.shippingMode =
+      `Satuan ${UNIT_LABELS[unit as Unit]} hanya cocok dengan FCL. ` +
+      `Untuk ${shippingMode}, pakai satuan berat atau volume seperti kg, MT, atau CBM.`;
+  }
 
   // --- Lokasi ---
   const originCountry = str(raw, "originCountry");
@@ -299,6 +343,8 @@ export function validateListingDraft(input: unknown): ValidationResult {
       price,
       currency: currency as Currency,
       incoterm: incoterm as Incoterm,
+      shippingMode: shippingMode as ShippingMode,
+      containerType,
       originCountry,
       destinationCountry,
       port,

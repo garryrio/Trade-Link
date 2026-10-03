@@ -5,7 +5,9 @@ import { cn } from "@/lib/cn";
 import { formatMoney, formatQuantity, daysUntil } from "@/lib/format";
 import {
   CATEGORY_META,
+  CONTAINER_META,
   LISTING_KIND_META,
+  SHIPPING_MODE_META,
   STATUS_META,
   UNIT_SUFFIX,
   type Listing,
@@ -113,8 +115,16 @@ export function ListingCard({
             </dd>
           </div>
           <div>
-            <dt className="text-xs text-slate-500">Incoterm</dt>
-            <dd className="font-semibold text-navy-900">{listing.incoterm}</dd>
+            <dt className="text-xs text-slate-500">Incoterm &amp; metode</dt>
+            <dd className="font-semibold text-navy-900">
+              {listing.incoterm}
+              <span className="font-normal text-slate-500">
+                {" / "}
+                {SHIPPING_MODE_META[listing.shippingMode].label}
+                {listing.containerType &&
+                  ` ${CONTAINER_META[listing.containerType].label}`}
+              </span>
+            </dd>
           </div>
           <div className="min-w-0">
             <dt className="text-xs text-slate-500">

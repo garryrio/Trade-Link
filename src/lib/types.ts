@@ -66,7 +66,8 @@ export type Unit =
   | "carton"
   | "cbm"
   | "container20"
-  | "container40";
+  | "container40"
+  | "container45";
 
 export const UNIT_LABELS: Record<Unit, string> = {
   kg: "kg",
@@ -77,6 +78,7 @@ export const UNIT_LABELS: Record<Unit, string> = {
   cbm: "m³ (CBM)",
   container20: "kontainer 20ft",
   container40: "kontainer 40ft",
+  container45: "kontainer 45ft",
 };
 
 /** Label singkat untuk ditempel di belakang angka. */
@@ -89,6 +91,138 @@ export const UNIT_SUFFIX: Record<Unit, string> = {
   cbm: "m³",
   container20: "x 20ft",
   container40: "x 40ft",
+  container45: "x 45ft",
+};
+
+/* ============================================================
+   Kontainer dan metode pengiriman
+   ============================================================ */
+
+/**
+ * Tipe kontainer laut yang didukung.
+ *
+ * "45ft" di lapangan selalu berupa High Cube: tidak ada 45ft standar.
+ */
+export type ContainerType = "20ft" | "40ft" | "45ft";
+
+export const CONTAINER_TYPES: ContainerType[] = ["20ft", "40ft", "45ft"];
+
+/**
+ * Spesifikasi nominal kontainer.
+ *
+ * PENTING: angka di sini adalah ukuran katalog pabrikan. Batas sebenarnya
+ * yang berlaku untuk satu pengiriman ditentukan oleh pelayaran, aturan
+ * tonase jalan di negara asal dan tujuan, serta kondisi kontainer. Jadi
+ * pakai ini sebagai pagar perkiraan, bukan angka final.
+ */
+export const CONTAINER_META: Record<
+  ContainerType,
+  {
+    label: string;
+    /** Nama teknis di dokumen pelayaran. */
+    isoName: string;
+    /** Volume dalam ruang, m³. */
+    capacityCbm: number;
+    /** Batas berat muatan (payload) menurut katalog, kg. */
+    maxPayloadKg: number;
+    /**
+     * Berat muatan yang realistis dipakai pelaku di Indonesia, kg.
+     * Lebih rendah dari maxPayloadKg karena batas tonase jalan.
+     */
+    practicalPayloadKg: number;
+    description: string;
+  }
+> = {
+  "20ft": {
+    label: "20 ft",
+    isoName: "20' General Purpose (20GP)",
+    capacityCbm: 33,
+    maxPayloadKg: 28_200,
+    practicalPayloadKg: 22_000,
+    description:
+      "Pilihan umum untuk barang berat bervolume kecil, mis. kopi, rempah, mineral olahan.",
+  },
+  "40ft": {
+    label: "40 ft",
+    isoName: "40' General Purpose (40GP)",
+    capacityCbm: 67,
+    maxPayloadKg: 26_700,
+    practicalPayloadKg: 24_000,
+    description:
+      "Volume dua kali 20ft dengan batas berat hampir sama. Cocok untuk barang ringan bervolume besar.",
+  },
+  "45ft": {
+    label: "45 ft",
+    isoName: "45' High Cube (45HC)",
+    capacityCbm: 86,
+    maxPayloadKg: 27_600,
+    practicalPayloadKg: 24_500,
+    description:
+      "Volume terbesar. Ketersediaan terbatas dan tidak semua pelabuhan atau truk bisa menanganinya, jadi konfirmasi dulu ke pelayaran.",
+  },
+};
+
+/** Satuan kuantitas yang berarti "sejumlah kontainer". */
+export const CONTAINER_UNIT: Record<ContainerType, Unit> = {
+  "20ft": "container20",
+  "40ft": "container40",
+  "45ft": "container45",
+};
+
+/**
+ * Metode pengiriman.
+ * - FCL  : satu kontainer penuh disewa sendiri.
+ * - LCL  : barang digabung dengan kiriman pihak lain dalam satu kontainer.
+ * - BULK : curah tanpa kontainer, mis. CPO, batu bara, cangkang sawit.
+ * - AIR  : kargo udara.
+ */
+export type ShippingMode = "FCL" | "LCL" | "BULK" | "AIR";
+
+export const SHIPPING_MODES: ShippingMode[] = ["FCL", "LCL", "BULK", "AIR"];
+
+export const SHIPPING_MODE_META: Record<
+  ShippingMode,
+  {
+    label: string;
+    name: string;
+    short: string;
+    description: string;
+    /** true bila metode ini memakai kontainer bertipe ContainerType. */
+    usesContainer: boolean;
+  }
+> = {
+  FCL: {
+    label: "FCL",
+    name: "Full Container Load",
+    short: "Satu kontainer penuh untuk Anda sendiri",
+    description:
+      "Anda menyewa seluruh kontainer. Biaya per satuan paling murah bila muatan hampir penuh, dan barang tidak dibongkar di tengah jalan.",
+    usesContainer: true,
+  },
+  LCL: {
+    label: "LCL",
+    name: "Less than Container Load",
+    short: "Barang digabung dengan kiriman lain",
+    description:
+      "Dibayar per CBM atau per ton, mana yang lebih besar. Pas untuk volume kecil, tapi ada proses konsolidasi dan dekonsolidasi sehingga waktu tempuh lebih lama.",
+    usesContainer: false,
+  },
+  BULK: {
+    label: "Curah",
+    name: "Bulk / Break Bulk",
+    short: "Tanpa kontainer, langsung ke palka kapal",
+    description:
+      "Untuk komoditas curah seperti CPO, batu bara, atau cangkang sawit. Butuh kapal dan terminal khusus.",
+    usesContainer: false,
+  },
+  AIR: {
+    label: "Udara",
+    name: "Air Freight",
+    short: "Kargo udara, cepat tapi mahal",
+    description:
+      "Dibayar atas berat terbesar antara berat asli dan berat volume. Dipakai untuk barang bernilai tinggi, mudah rusak, atau kejar tenggat.",
+    usesContainer: false,
+  },
 };
 
 export type Currency = "USD" | "IDR" | "EUR" | "JPY" | "CNY";
@@ -201,6 +335,14 @@ export interface Listing {
   price: number | null;
   currency: Currency;
   incoterm: Incoterm;
+  /**
+   * Metode pengiriman yang ditawarkan (supply) atau diminta (demand).
+   * Ikut menentukan estimasi waktu tempuh, karena LCL perlu waktu
+   * konsolidasi tambahan sedangkan udara jauh lebih singkat.
+   */
+  shippingMode: ShippingMode;
+  /** Tipe kontainer bila metodenya FCL. null untuk LCL, curah, dan udara. */
+  containerType: ContainerType | null;
   /** Negara asal barang. */
   originCountry: string;
   /** Negara tujuan. Untuk supply bisa berupa "Terbuka (global)". */
@@ -241,6 +383,8 @@ export interface ListingDraft {
   price: number | null;
   currency: Currency;
   incoterm: Incoterm;
+  shippingMode: ShippingMode;
+  containerType: ContainerType | null;
   originCountry: string;
   destinationCountry: string;
   port: string;

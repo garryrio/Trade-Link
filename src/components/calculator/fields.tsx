@@ -187,9 +187,12 @@ export function ResultStat({
       >
         {label}
       </p>
+      {/* Ukuran huruf naik bertahap. Nilai rupiah bisa mencapai 15 karakter
+          seperti "Rp1.818.086.800"; pada 20px di layar 375px angka itu lebih
+          lebar daripada kolomnya dan ujungnya terpotong. */}
       <p
         className={cn(
-          "mt-1 text-xl font-bold tabular-nums",
+          "mt-1 text-base font-bold tabular-nums sm:text-lg lg:text-xl",
           tone === "brand"
             ? "text-white"
             : tone === "up"
@@ -316,4 +319,230 @@ export function ResultRow({
 /** Format angka mata uang asing dengan kode mata uangnya. */
 export function foreignAmount(value: number, code: string): string {
   return `${code} ${formatNumber(value, 2)}`;
+}
+
+/* ============================================================
+   Komponen khusus kalkulator ekspor
+   ============================================================ */
+
+interface TextFieldProps {
+  id: string;
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  hint?: ReactNode;
+  placeholder?: string;
+  /** Daftar saran. Dipasang lewat <datalist>, pengguna tetap bisa menulis bebas. */
+  suggestions?: readonly string[];
+  className?: string;
+}
+
+export function TextField({
+  id,
+  label,
+  value,
+  onChange,
+  hint,
+  placeholder,
+  suggestions,
+  className,
+}: TextFieldProps) {
+  const listId = suggestions ? `${id}-list` : undefined;
+
+  return (
+    <div className={className}>
+      <label htmlFor={id} className="field-label">
+        {label}
+      </label>
+      <input
+        id={id}
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        list={listId}
+        autoComplete="off"
+        className="field-input"
+      />
+      {suggestions && (
+        <datalist id={listId}>
+          {suggestions.map((s) => (
+            <option key={s} value={s} />
+          ))}
+        </datalist>
+      )}
+      {hint && <p className="field-hint">{hint}</p>}
+    </div>
+  );
+}
+
+/** Satu baris pada lembar biaya. */
+export interface SheetTableRow {
+  /** Nomor baris yang sudah digabung, mis. "4a". */
+  code: string;
+  label: string;
+  total: number;
+  perUnit: number;
+  formula?: string;
+  /** "group" untuk subtotal grup, "milestone" untuk harga FOB/CFR/CIF. */
+  kind?: "row" | "group" | "milestone";
+}
+
+/**
+ * Tabel lembar biaya ekspor.
+ *
+ * Sengaja TIDAK memakai min-width dan gulir horizontal seperti
+ * BreakdownTable. Lembar ini adalah keluaran utama kalkulator, dan memaksa
+ * pengguna ponsel menggulir ke samping untuk melihat kolom jumlah membuat
+ * angka terpentingnya tersembunyi. Yang dilakukan: huruf lebih kecil di
+ * layar sempit, nama komponen boleh membungkus beberapa baris, dan kolom
+ * angka dijaga agar tidak terpotong.
+ */
+export function SheetTable({
+  rows,
+  unitSuffix,
+}: {
+  rows: SheetTableRow[];
+  unitSuffix: string;
+}) {
+  return (
+    <table className="w-full text-xs sm:text-sm">
+      <caption className="sr-only">
+        Rincian biaya ekspor per komponen, dengan total dan biaya per satuan
+      </caption>
+      <thead>
+        <tr className="border-b border-slate-200 text-left">
+          <th
+            scope="col"
+            className="py-2 pr-2 text-[10px] font-semibold tracking-wide text-slate-600 uppercase sm:text-xs"
+          >
+            Komponen
+          </th>
+          <th
+            scope="col"
+            className="px-1 py-2 text-right text-[10px] font-semibold tracking-wide text-slate-600 uppercase sm:px-2 sm:text-xs"
+          >
+            Total
+          </th>
+          <th
+            scope="col"
+            className="py-2 pl-1 text-right text-[10px] font-semibold tracking-wide text-slate-600 uppercase sm:pl-2 sm:text-xs"
+          >
+            Per {unitSuffix}
+          </th>
+        </tr>
+      </thead>
+      <tbody className="divide-y divide-slate-100">
+        {rows.map((row) => {
+          const kind = row.kind ?? "row";
+
+          return (
+            <tr
+              key={`${row.code}-${row.label}`}
+              className={cn(
+                kind === "group" && "bg-slate-50",
+                kind === "milestone" && "bg-brand-50",
+              )}
+            >
+              <th
+                scope="row"
+                className={cn(
+                  "py-2 pr-2 text-left align-top font-normal",
+                  kind === "row" && "text-slate-700",
+                  kind === "group" && "font-semibold text-navy-900",
+                  kind === "milestone" && "font-bold text-brand-800",
+                )}
+              >
+                <span className="flex gap-1.5">
+                  {row.code && (
+                    <span
+                      className={cn(
+                        "shrink-0 tabular-nums",
+                        kind === "row" ? "text-slate-400" : "text-brand-700",
+                      )}
+                    >
+                      {row.code}
+                    </span>
+                  )}
+                  <span className="min-w-0">
+                    {row.label}
+                    {row.formula && (
+                      <span className="mt-0.5 block text-[10px] leading-snug text-slate-500 sm:text-xs">
+                        {row.formula}
+                      </span>
+                    )}
+                  </span>
+                </span>
+              </th>
+              <td
+                className={cn(
+                  "px-1 py-2 text-right align-top whitespace-nowrap tabular-nums sm:px-2",
+                  kind === "row" && "text-navy-800",
+                  kind === "group" && "font-semibold text-navy-900",
+                  kind === "milestone" && "font-bold text-brand-800",
+                )}
+              >
+                {formatIDR(row.total)}
+              </td>
+              <td
+                className={cn(
+                  "py-2 pl-1 text-right align-top whitespace-nowrap tabular-nums sm:pl-2",
+                  kind === "row" && "text-slate-600",
+                  kind === "group" && "font-semibold text-navy-900",
+                  kind === "milestone" && "font-bold text-brand-800",
+                )}
+              >
+                {formatIDR(row.perUnit)}
+              </td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  );
+}
+
+/** Daftar centang untuk memilih dokumen yang akan diurus. */
+export function CheckboxRow({
+  id,
+  label,
+  checked,
+  onChange,
+  hint,
+  amount,
+}: {
+  id: string;
+  label: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  hint?: ReactNode;
+  amount?: string;
+}) {
+  return (
+    <label
+      htmlFor={id}
+      className="flex cursor-pointer gap-3 rounded-lg border border-slate-200 p-3 transition-colors hover:border-brand-300 has-checked:border-brand-500 has-checked:bg-brand-50/60"
+    >
+      <input
+        id={id}
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        className="mt-0.5 h-4 w-4 shrink-0 accent-brand-600"
+      />
+      <span className="min-w-0 flex-1">
+        <span className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
+          <span className="text-sm font-medium text-navy-900">{label}</span>
+          {amount && (
+            <span className="text-xs tabular-nums text-slate-600">{amount}</span>
+          )}
+        </span>
+        {hint && (
+          <span className="mt-1 block text-xs leading-relaxed text-slate-600">
+            {hint}
+          </span>
+        )}
+      </span>
+    </label>
+  );
 }
