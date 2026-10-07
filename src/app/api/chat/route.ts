@@ -293,6 +293,12 @@ export async function POST(request: Request) {
       "Cache-Control": "no-store",
       // Cegah proxy menahan buffer supaya teks muncul bertahap.
       "X-Accel-Buffering": "no",
+      /* Model yang benar-benar melayani jawaban ini. Berguna untuk
+         memastikan GEMINI_MODEL sudah terbaca, dan untuk melihat kapan
+         jawaban dilayani model cadangan. Bertanya ke chatbot "kamu model
+         apa" TIDAK bisa dipercaya: model sering salah menyebut namanya
+         sendiri. Nama model bukan rahasia, jadi aman dikirim ke browser. */
+      "X-TradeLink-Model": attempt.model,
     },
   });
 }

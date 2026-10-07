@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { cn } from "@/lib/cn";
 
 interface LogoProps {
@@ -7,45 +8,55 @@ interface LogoProps {
   showWordmark?: boolean;
 }
 
+/* Warna resmi logo, diambil dari file desain maskot. */
+const NAVY = "#1b3370";
+const BLUE = "#5b87e8";
+
 /**
- * Logo TradeLink: dua node yang terhubung, melambangkan eksportir & importir
- * yang saling tersambung.
+ * Logo TradeLink: maskot tunas pembawa koper yang menyeberangi jembatan.
+ *
+ * Gambar yang dipakai adalah `public/brand/tradelink-mark.png`, yaitu maskot
+ * dan jembatannya saja, berlatar transparan. Tulisan "TradeLink" tidak
+ * diambil dari gambar melainkan dirender sebagai teks. Alasannya: di
+ * navbar setinggi 64px, tulisan di dalam gambar hanya akan setinggi sekitar
+ * 12px dan kabur. Teks HTML tetap tajam dan bisa dibaca pembaca layar.
+ *
+ * Versi lengkap dengan tulisan ada di `public/brand/tradelink-logo.png`,
+ * untuk dipakai di dokumen, presentasi, atau media sosial.
  */
 export function Logo({
   className,
   variant = "dark",
   showWordmark = true,
 }: LogoProps) {
-  const textColor = variant === "light" ? "text-white" : "text-navy-900";
-  const accentColor = variant === "light" ? "text-brand-300" : "text-brand-600";
+  const light = variant === "light";
 
   return (
-    <span className={cn("inline-flex items-center gap-2.5", className)}>
+    <span className={cn("inline-flex items-center gap-2", className)}>
+      {/* Di latar gelap maskot diberi alas putih. Badan maskot berwarna
+          navy, jadi tanpa alas ia menyatu dengan latar footer dan hilang. */}
       <span
-        aria-hidden="true"
-        className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-gradient-to-br from-brand-500 to-brand-700 shadow-sm"
+        className={cn(
+          "inline-grid shrink-0 place-items-center",
+          light && "rounded-lg bg-white p-1",
+        )}
       >
-        <svg
-          viewBox="0 0 24 24"
-          fill="none"
-          className="h-5 w-5 text-white"
-          strokeWidth="2.1"
-          stroke="currentColor"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <circle cx="6" cy="6" r="2.6" />
-          <circle cx="18" cy="18" r="2.6" />
-          <path d="M8.3 7.6 15.7 16.4" />
-          <path d="M18 5.5h-5.2" />
-          <path d="M16.2 3.6 18 5.5l-1.8 1.9" />
-          <path d="M6 18.5h5.2" />
-          <path d="M7.8 20.4 6 18.5l1.8-1.9" />
-        </svg>
+        <Image
+          src="/brand/tradelink-mark.png"
+          alt={showWordmark ? "" : "TradeLink"}
+          width={683}
+          height={558}
+          priority
+          className="h-10 w-auto"
+        />
       </span>
       {showWordmark && (
-        <span className={cn("text-lg font-bold tracking-tight", textColor)}>
-          Trade<span className={accentColor}>Link</span>
+        <span
+          className="text-xl font-extrabold tracking-tight"
+          style={{ color: light ? "#ffffff" : NAVY }}
+        >
+          Trade
+          <span style={{ color: light ? "#93b4f5" : BLUE }}>Link</span>
         </span>
       )}
     </span>
